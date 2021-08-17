@@ -1,0 +1,10 @@
+*
+*/*
+
+!.gitignore
+!brittany.yaml
+!mustard.cabal
+!driver
+!driver/**
+!src
+!src/**
