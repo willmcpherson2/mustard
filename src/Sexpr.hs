@@ -40,20 +40,21 @@ data Lit
 mkSexpr :: [Token] -> Sexpr
 mkSexpr = Branch . snd . mk
   where
-    mk (Open : tokens) =
-      let
-        (tokens', sexprs) = mk tokens
-        branch = Branch sexprs
-        (tokens'', sexprs') = mk tokens'
-      in (tokens'', branch : sexprs')
-    mk (Other s : tokens) =
-      let
-        leaf = Leaf $ mkSymbol s
-        (tokens', sexprs) = mk tokens
-      in (tokens', leaf : sexprs)
-    mk (Close : tokens) = (tokens, [])
-    mk (_ : tokens) = let (tokens', sexprs) = mk tokens in (tokens', sexprs)
-    mk [] = ([], [])
+    mk tokens = case tokens of
+      Open : tokens ->
+        let
+          (tokens', sexprs) = mk tokens
+          branch = Branch sexprs
+          (tokens'', sexprs') = mk tokens'
+        in (tokens'', branch : sexprs')
+      Other s : tokens ->
+        let
+          leaf = Leaf $ mkSymbol s
+          (tokens', sexprs) = mk tokens
+        in (tokens', leaf : sexprs)
+      Close : tokens -> (tokens, [])
+      _ : tokens -> let (tokens', sexprs) = mk tokens in (tokens', sexprs)
+      [] -> ([], [])
 
 mkSymbol :: String -> Symbol
 mkSymbol s =
