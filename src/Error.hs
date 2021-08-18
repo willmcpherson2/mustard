@@ -3,7 +3,7 @@ module Error (Error(..), Fallible) where
 data Error
   = UnexpectedOp
   | ExpectedItem
-  | ExpectedName
+  | ExpectedBinder
   | ExpectedVal
   | ExpectedType
   | ExpectedCtor

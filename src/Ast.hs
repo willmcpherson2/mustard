@@ -17,30 +17,30 @@ data Item
   | ItemError Error
   deriving Show
 
-data Let = Let Name Expr | LetError Error
+data Let = Let Binder Expr | LetError Error
   deriving Show
 
-data Def = Def Name [Ctor] | DefError Error
+data Def = Def Binder [Ctor] | DefError Error
   deriving Show
 
-data Name = Name String | NameError Error
+data Binder = Binder String | BinderError Error
   deriving Show
 
 data Expr = Expr (Maybe Type) Val
   deriving Show
 
-data Ctor = Ctor Name [Type] | CtorError Error
+data Ctor = Ctor Binder [Type] | CtorError Error
   deriving Show
 
 data Type
-  = TypeName QualName
+  = TypeName Name
   | TypeUnit
   | TypeFun Fun
   | TypeError Error
   deriving Show
 
 data Val
-  = ValName QualName
+  = ValName Name
   | ValLit Lit
   | ValLam Lam
   | ValCase Case
@@ -48,7 +48,7 @@ data Val
   | ValError Error
   deriving Show
 
-data QualName = QualName [String] | QualNameError Error
+data Name = Name [String] | NameError Error
   deriving Show
 
 data Fun = Fun Type Type
@@ -60,7 +60,7 @@ data Lit
   | LitUnit
   deriving Show
 
-data Lam = Lam Name Expr | LamError Error
+data Lam = Lam Binder Expr | LamError Error
   deriving Show
 
 data Case = Case Expr [Alt] | CaseError Error
@@ -73,7 +73,7 @@ data Alt = Alt Pat Expr | AltError Error
   deriving Show
 
 data Pat
-  = PatName QualName
+  = PatName Name
   | PatLit Lit
   | PatApp AppPat
   | PatError Error
@@ -97,24 +97,24 @@ mkItem = firstOr
 mkLet :: Bexpr -> Maybe Let
 mkLet bexpr = do
   Branch Equal l r <- return bexpr
-  Just $ Let (mkNameError l) (mkExpr r)
+  Just $ Let (mkBinderError l) (mkExpr r)
 
 mkDef :: Bexpr -> Maybe Def
 mkDef bexpr = do
   Branch Colon l r <- return bexpr
-  Just $ Def (mkNameError l) (mkCtors r)
+  Just $ Def (mkBinderError l) (mkCtors r)
   where
     mkCtors bexpr = case bexpr of
       Branch Pipe l r -> mkCtor l : mkCtors r
       bexpr -> [mkCtor bexpr]
 
-mkName :: Bexpr -> Maybe Name
-mkName bexpr = do
+mkBinder :: Bexpr -> Maybe Binder
+mkBinder bexpr = do
   Leaf (Sexpr.Name [name]) <- return bexpr
-  Just $ Name name
+  Just $ Binder name
 
-mkNameError :: Bexpr -> Name
-mkNameError bexpr = fromMaybe (NameError ExpectedName) (mkName bexpr)
+mkBinderError :: Bexpr -> Binder
+mkBinderError bexpr = fromMaybe (BinderError ExpectedBinder) (mkBinder bexpr)
 
 mkExpr :: Bexpr -> Expr
 mkExpr bexpr = case bexpr of
@@ -123,16 +123,16 @@ mkExpr bexpr = case bexpr of
 
 mkCtor :: Bexpr -> Ctor
 mkCtor bexpr = case bexpr of
-  Leaf (Sexpr.Name [name]) -> Ctor (Name name) []
+  Leaf (Sexpr.Name [name]) -> Ctor (Binder name) []
   Branch App l r -> case mkCtor l of
-    Ctor name types -> Ctor name (types ++ [mkType r])
+    Ctor binder types -> Ctor binder (types ++ [mkType r])
     error -> error
   _ -> CtorError ExpectedCtor
 
 mkType :: Bexpr -> Type
 mkType = firstOr
   (TypeError ExpectedType)
-  [ Just . TypeName <=< mkQualName
+  [ Just . TypeName <=< mkName
   , Just . const TypeUnit <=< mkUnit
   , Just . TypeFun <=< mkFun
   ]
@@ -140,17 +140,17 @@ mkType = firstOr
 mkVal :: Bexpr -> Val
 mkVal = firstOr
   (ValError ExpectedVal)
-  [ Just . ValName <=< mkQualName
+  [ Just . ValName <=< mkName
   , Just . ValLit <=< mkLit
   , Just . ValLam <=< mkLam
   , Just . ValCase <=< mkCase
   , Just . ValApp <=< mkAppVal
   ]
 
-mkQualName :: Bexpr -> Maybe QualName
-mkQualName bexpr = do
+mkName :: Bexpr -> Maybe Name
+mkName bexpr = do
   Leaf (Sexpr.Name name) <- return bexpr
-  Just $ QualName name
+  Just $ Name name
 
 mkFun :: Bexpr -> Maybe Fun
 mkFun bexpr = do
@@ -167,7 +167,7 @@ mkLit = first
 mkLam :: Bexpr -> Maybe Lam
 mkLam bexpr = do
   Branch Arrow l r <- return bexpr
-  Just $ Lam (mkNameError l) (mkExpr r)
+  Just $ Lam (mkBinderError l) (mkExpr r)
 
 mkCase :: Bexpr -> Maybe Case
 mkCase bexpr = do
@@ -191,7 +191,7 @@ mkAlt bexpr = case bexpr of
 mkPat :: Bexpr -> Pat
 mkPat = firstOr
   (PatError ExpectedPat)
-  [ Just . PatName <=< mkQualName
+  [ Just . PatName <=< mkName
   , Just . PatLit <=< mkLit
   , Just . PatApp <=< mkAppPat
   ]
