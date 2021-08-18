@@ -23,13 +23,7 @@ data Let = Let Name Expr | LetError Error
 data Def = Def Name [Ctor] | DefError Error
   deriving Show
 
-data Expr
-  = ExprName QualName
-  | ExprLit Lit
-  | ExprLam Lam
-  | ExprCase Case
-  | ExprApp AppExpr
-  | ExprError Error
+data Expr = Expr (Maybe Type) Val
   deriving Show
 
 data Type
@@ -40,6 +34,15 @@ data Type
   deriving Show
 
 data Ctor = Ctor Name [Type] | CtorError Error
+  deriving Show
+
+data Val
+  = ValName QualName
+  | ValLit Lit
+  | ValLam Lam
+  | ValCase Case
+  | ValApp AppVal
+  | ValError Error
   deriving Show
 
 data Lit
@@ -54,7 +57,7 @@ data Lam = Lam Name Expr | LamError Error
 data Case = Case Expr [Alt] | CaseError Error
   deriving Show
 
-data AppExpr = AppExpr Expr Expr
+data AppVal = AppVal Expr Expr
   deriving Show
 
 data Alt = Alt Pat Expr | AltError Error
@@ -110,14 +113,9 @@ mkDef bexpr = do
       bexpr -> [mkCtor bexpr]
 
 mkExpr :: Bexpr -> Expr
-mkExpr = firstOr
-  (ExprError ExpectedExpr)
-  [ Just . ExprName <=< mkQualName
-  , Just . ExprLit <=< mkLit
-  , Just . ExprLam <=< mkLam
-  , Just . ExprCase <=< mkCase
-  , Just . ExprApp <=< mkAppExpr
-  ]
+mkExpr bexpr = case bexpr of
+  Branch Colon l r -> Expr (Just (mkType l)) (mkVal r)
+  bexpr -> Expr Nothing (mkVal bexpr)
 
 mkType :: Bexpr -> Type
 mkType = firstOr
@@ -134,6 +132,16 @@ mkCtor bexpr = case bexpr of
     Ctor name types -> Ctor name (types ++ [mkType r])
     error -> error
   _ -> CtorError ExpectedCtor
+
+mkVal :: Bexpr -> Val
+mkVal = firstOr
+  (ValError ExpectedVal)
+  [ Just . ValName <=< mkQualName
+  , Just . ValLit <=< mkLit
+  , Just . ValLam <=< mkLam
+  , Just . ValCase <=< mkCase
+  , Just . ValApp <=< mkAppVal
+  ]
 
 mkLit :: Bexpr -> Maybe Lit
 mkLit = first
@@ -156,10 +164,10 @@ mkCase bexpr = do
       Branch App l r -> mkAlts l ++ [mkAlt r]
       bexpr -> [mkAlt bexpr]
 
-mkAppExpr :: Bexpr -> Maybe AppExpr
-mkAppExpr bexpr = do
+mkAppVal :: Bexpr -> Maybe AppVal
+mkAppVal bexpr = do
   Branch App l r <- return bexpr
-  Just $ AppExpr (mkExpr l) (mkExpr r)
+  Just $ AppVal (mkExpr l) (mkExpr r)
 
 mkUnit :: Bexpr -> Maybe ()
 mkUnit bexpr = do

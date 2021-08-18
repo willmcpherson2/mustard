@@ -4,7 +4,7 @@ data Error
   = UnexpectedOp
   | ExpectedItem
   | ExpectedName
-  | ExpectedExpr
+  | ExpectedVal
   | ExpectedType
   | ExpectedCtor
   | ExpectedAlt
