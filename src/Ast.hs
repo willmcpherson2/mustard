@@ -23,7 +23,13 @@ data Let = Let Name Expr | LetError Error
 data Def = Def Name [Ctor] | DefError Error
   deriving Show
 
+data Name = Name String | NameError Error
+  deriving Show
+
 data Expr = Expr (Maybe Type) Val
+  deriving Show
+
+data Ctor = Ctor Name [Type] | CtorError Error
   deriving Show
 
 data Type
@@ -33,9 +39,6 @@ data Type
   | TypeError Error
   deriving Show
 
-data Ctor = Ctor Name [Type] | CtorError Error
-  deriving Show
-
 data Val
   = ValName QualName
   | ValLit Lit
@@ -43,6 +46,12 @@ data Val
   | ValCase Case
   | ValApp AppVal
   | ValError Error
+  deriving Show
+
+data QualName = QualName [String] | QualNameError Error
+  deriving Show
+
+data Fun = Fun Type Type
   deriving Show
 
 data Lit
@@ -63,9 +72,6 @@ data AppVal = AppVal Expr Expr
 data Alt = Alt Pat Expr | AltError Error
   deriving Show
 
-data Fun = Fun Type Type
-  deriving Show
-
 data Pat
   = PatName QualName
   | PatLit Lit
@@ -76,17 +82,7 @@ data Pat
 data AppPat = AppPat Pat Pat
   deriving Show
 
-data Name = Name String | NameError Error
-  deriving Show
-
-data QualName = QualName [String] | QualNameError Error
-  deriving Show
-
-first :: [Bexpr -> Maybe a] -> Bexpr -> Maybe a
-first parsers bexpr = asum $ map ($ bexpr) parsers
-
-firstOr :: a -> [Bexpr -> Maybe a] -> Bexpr -> a
-firstOr error parsers bexpr = fromMaybe error (first parsers bexpr)
+--------------------------------------------------------------------------------
 
 mkAst :: Bexpr -> Ast
 mkAst bexpr = case bexpr of
@@ -112,18 +108,18 @@ mkDef bexpr = do
       Branch Pipe l r -> mkCtor l : mkCtors r
       bexpr -> [mkCtor bexpr]
 
+mkName :: Bexpr -> Maybe Name
+mkName bexpr = do
+  Leaf (Sexpr.Name [name]) <- return bexpr
+  Just $ Name name
+
+mkNameError :: Bexpr -> Name
+mkNameError bexpr = fromMaybe (NameError ExpectedName) (mkName bexpr)
+
 mkExpr :: Bexpr -> Expr
 mkExpr bexpr = case bexpr of
   Branch Colon l r -> Expr (Just (mkType l)) (mkVal r)
   bexpr -> Expr Nothing (mkVal bexpr)
-
-mkType :: Bexpr -> Type
-mkType = firstOr
-  (TypeError ExpectedType)
-  [ Just . TypeName <=< mkQualName
-  , Just . const TypeUnit <=< mkUnit
-  , Just . TypeFun <=< mkFun
-  ]
 
 mkCtor :: Bexpr -> Ctor
 mkCtor bexpr = case bexpr of
@@ -132,6 +128,14 @@ mkCtor bexpr = case bexpr of
     Ctor name types -> Ctor name (types ++ [mkType r])
     error -> error
   _ -> CtorError ExpectedCtor
+
+mkType :: Bexpr -> Type
+mkType = firstOr
+  (TypeError ExpectedType)
+  [ Just . TypeName <=< mkQualName
+  , Just . const TypeUnit <=< mkUnit
+  , Just . TypeFun <=< mkFun
+  ]
 
 mkVal :: Bexpr -> Val
 mkVal = firstOr
@@ -142,6 +146,16 @@ mkVal = firstOr
   , Just . ValCase <=< mkCase
   , Just . ValApp <=< mkAppVal
   ]
+
+mkQualName :: Bexpr -> Maybe QualName
+mkQualName bexpr = do
+  Leaf (Sexpr.Name name) <- return bexpr
+  Just $ QualName name
+
+mkFun :: Bexpr -> Maybe Fun
+mkFun bexpr = do
+  Branch Arrow l r <- return bexpr
+  Just $ Fun (mkType l) (mkType r)
 
 mkLit :: Bexpr -> Maybe Lit
 mkLit = first
@@ -169,39 +183,6 @@ mkAppVal bexpr = do
   Branch App l r <- return bexpr
   Just $ AppVal (mkExpr l) (mkExpr r)
 
-mkUnit :: Bexpr -> Maybe ()
-mkUnit bexpr = do
-  Leaf Unit <- return bexpr
-  Just ()
-
-mkFun :: Bexpr -> Maybe Fun
-mkFun bexpr = do
-  Branch Arrow l r <- return bexpr
-  Just $ Fun (mkType l) (mkType r)
-
-mkName :: Bexpr -> Maybe Name
-mkName bexpr = do
-  Leaf (Sexpr.Name [name]) <- return bexpr
-  Just $ Name name
-
-mkQualName :: Bexpr -> Maybe QualName
-mkQualName bexpr = do
-  Leaf (Sexpr.Name name) <- return bexpr
-  Just $ QualName name
-
-mkNameError :: Bexpr -> Name
-mkNameError bexpr = fromMaybe (NameError ExpectedName) (mkName bexpr)
-
-mkFloat :: Bexpr -> Maybe Float
-mkFloat bexpr = do
-  Leaf (Lit (Sexpr.Float float)) <- return bexpr
-  Just float
-
-mkInt :: Bexpr -> Maybe Int
-mkInt bexpr = do
-  Leaf (Lit (Sexpr.Int int)) <- return bexpr
-  Just int
-
 mkAlt :: Bexpr -> Alt
 mkAlt bexpr = case bexpr of
   Branch Arrow l r -> Alt (mkPat l) (mkExpr r)
@@ -219,3 +200,26 @@ mkAppPat :: Bexpr -> Maybe AppPat
 mkAppPat bexpr = do
   Branch App l r <- return bexpr
   Just $ AppPat (mkPat l) (mkPat r)
+
+--------------------------------------------------------------------------------
+
+first :: [Bexpr -> Maybe a] -> Bexpr -> Maybe a
+first parsers bexpr = asum $ map ($ bexpr) parsers
+
+firstOr :: a -> [Bexpr -> Maybe a] -> Bexpr -> a
+firstOr error parsers bexpr = fromMaybe error (first parsers bexpr)
+
+mkUnit :: Bexpr -> Maybe ()
+mkUnit bexpr = do
+  Leaf Unit <- return bexpr
+  Just ()
+
+mkFloat :: Bexpr -> Maybe Float
+mkFloat bexpr = do
+  Leaf (Lit (Sexpr.Float float)) <- return bexpr
+  Just float
+
+mkInt :: Bexpr -> Maybe Int
+mkInt bexpr = do
+  Leaf (Lit (Sexpr.Int int)) <- return bexpr
+  Just int
