@@ -24,7 +24,6 @@ data Atom
 
 data Op
   = Dollar
-  | ColonEqual
   | Equal
   | Colon
   | Pipe
@@ -69,7 +68,6 @@ mkOp s = Op <$> lookup s (fromList ops)
       , (":", Colon)
       , ("|", Pipe)
       , ("=", Equal)
-      , (":=", ColonEqual)
       , ("$", Dollar)
       ]
 

@@ -13,15 +13,11 @@ newtype Ast = Ast [Item]
 
 data Item
   = ItemLet Let
-  | ItemDecl Decl
   | ItemDef Def
   | ItemError Error
   deriving Show
 
 data Let = Let Name Expr | LetError Error
-  deriving Show
-
-data Decl = Decl Name Type | DeclError Error
   deriving Show
 
 data Def = Def Name [Ctor] | DefError Error
@@ -97,24 +93,16 @@ mkAst bexpr = case bexpr of
 mkItem :: Bexpr -> Item
 mkItem = firstOr
   (ItemError ExpectedItem)
-  [ Just . ItemLet <=< mkLet
-  , Just . ItemDecl <=< mkDecl
-  , Just . ItemDef <=< mkDef
-  ]
+  [Just . ItemLet <=< mkLet, Just . ItemDef <=< mkDef]
 
 mkLet :: Bexpr -> Maybe Let
 mkLet bexpr = do
   Branch Equal l r <- return bexpr
   Just $ Let (mkNameError l) (mkExpr r)
 
-mkDecl :: Bexpr -> Maybe Decl
-mkDecl bexpr = do
-  Branch Colon l r <- return bexpr
-  Just $ Decl (mkNameError l) (mkType r)
-
 mkDef :: Bexpr -> Maybe Def
 mkDef bexpr = do
-  Branch ColonEqual l r <- return bexpr
+  Branch Colon l r <- return bexpr
   Just $ Def (mkNameError l) (mkCtors r)
   where
     mkCtors bexpr = case bexpr of

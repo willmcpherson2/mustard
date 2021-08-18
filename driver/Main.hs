@@ -9,7 +9,7 @@ import Text.Pretty.Simple
   ( CheckColorTty(NoCheckColorTty)
   , OutputOptions(..)
   , StringOutputStyle(Literal)
-  , defaultColorOptionsDarkBg
+  , defaultColorOptionsLightBg
   , pPrintOpt
   )
 
@@ -60,6 +60,6 @@ handleArgs args = case lookup "" args of
       , outputOptionsCompact = False
       , outputOptionsCompactParens = True
       , outputOptionsInitialIndent = 0
-      , outputOptionsColorOptions = Just defaultColorOptionsDarkBg
+      , outputOptionsColorOptions = Just defaultColorOptionsLightBg
       , outputOptionsStringStyle = Literal
       }
