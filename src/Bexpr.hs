@@ -16,6 +16,8 @@ mkBexpr sexpr = case sexpr of
     [] -> Leaf Unit
     [sexpr] -> mkBexpr sexpr
     [l, r] -> Branch App (mkBexpr l) (mkBexpr r)
+    l : Sexpr.Leaf (Op Dollar) : r ->
+      Branch App (mkBexpr l) (mkBexpr (Sexpr.Branch r))
     l : Sexpr.Leaf (Op op) : r ->
       Branch op (mkBexpr l) (mkBexpr (Sexpr.Branch r))
     l : r : rest -> mkBexpr (Sexpr.Branch (Sexpr.Branch [l, r] : rest))
