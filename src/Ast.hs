@@ -5,8 +5,9 @@ import Control.Monad ((<=<))
 import Data.Foldable (asum)
 import Data.Maybe (fromMaybe)
 import Error (Error(..))
-import Sexpr (Atom(Lit, Unit), Op(..))
-import qualified Sexpr (Atom(Name), Lit(..))
+import Sexpr
+  (Atom(Lit, Name, Unit), Name(Lower, NameError, Upper), Op(..), Path(..))
+import qualified Sexpr (Lit(..))
 
 newtype Ast = Ast [Item]
   deriving Show
@@ -17,38 +18,33 @@ data Item
   | ItemError Error
   deriving Show
 
-data Let = Let Binder Expr | LetError Error
+data Let = Let Path Expr | LetError Error
   deriving Show
 
-data Def = Def Binder [Ctor] | DefError Error
-  deriving Show
-
-data Binder = Binder String | BinderError Error
+data Def = Def Path [Ctor] | DefError Error
   deriving Show
 
 data Expr = Expr (Maybe Type) Val
   deriving Show
 
-data Ctor = Ctor Binder [Type] | CtorError Error
+data Ctor = Ctor Path [Type] | CtorError Error
   deriving Show
 
 data Type
-  = TypeName Name
+  = TypeName Path
   | TypeUnit
   | TypeFun Fun
   | TypeError Error
   deriving Show
 
 data Val
-  = ValName Name
+  = ValName Path
+  | ValCtor Path
   | ValLit Lit
   | ValLam Lam
   | ValCase Case
   | ValApp AppVal
   | ValError Error
-  deriving Show
-
-data Name = Name [String] | NameError Error
   deriving Show
 
 data Fun = Fun Type Type
@@ -60,7 +56,7 @@ data Lit
   | LitUnit
   deriving Show
 
-data Lam = Lam Binder Expr | LamError Error
+data Lam = Lam Path Expr | LamError Error
   deriving Show
 
 data Case = Case Expr [Alt] | CaseError Error
@@ -73,7 +69,8 @@ data Alt = Alt Pat Expr | AltError Error
   deriving Show
 
 data Pat
-  = PatName Name
+  = PatBinder Path
+  | PatCtor Path
   | PatLit Lit
   | PatApp AppPat
   | PatError Error
@@ -97,24 +94,16 @@ mkItem = firstOr
 mkLet :: Bexpr -> Maybe Let
 mkLet bexpr = do
   Branch Equal l r <- return bexpr
-  Just $ Let (mkBinderError l) (mkExpr r)
+  Just $ Let (mkLowerError l) (mkExpr r)
 
 mkDef :: Bexpr -> Maybe Def
 mkDef bexpr = do
   Branch Colon l r <- return bexpr
-  Just $ Def (mkBinderError l) (mkCtors r)
+  Just $ Def (mkUpperError l) (mkCtors r)
   where
     mkCtors bexpr = case bexpr of
       Branch Pipe l r -> mkCtor l : mkCtors r
       bexpr -> [mkCtor bexpr]
-
-mkBinder :: Bexpr -> Maybe Binder
-mkBinder bexpr = do
-  Leaf (Sexpr.Name [name]) <- return bexpr
-  Just $ Binder name
-
-mkBinderError :: Bexpr -> Binder
-mkBinderError bexpr = fromMaybe (BinderError ExpectedBinder) (mkBinder bexpr)
 
 mkExpr :: Bexpr -> Expr
 mkExpr bexpr = case bexpr of
@@ -123,7 +112,7 @@ mkExpr bexpr = case bexpr of
 
 mkCtor :: Bexpr -> Ctor
 mkCtor bexpr = case bexpr of
-  Leaf (Sexpr.Name [name]) -> Ctor (Binder name) []
+  Leaf name -> Ctor (mkUpperError (Leaf name)) []
   Branch App l r -> case mkCtor l of
     Ctor binder types -> Ctor binder (types ++ [mkType r])
     error -> error
@@ -132,7 +121,7 @@ mkCtor bexpr = case bexpr of
 mkType :: Bexpr -> Type
 mkType = firstOr
   (TypeError ExpectedType)
-  [ Just . TypeName <=< mkName
+  [ Just . TypeName <=< mkUpper
   , Just . const TypeUnit <=< mkUnit
   , Just . TypeFun <=< mkFun
   ]
@@ -140,17 +129,13 @@ mkType = firstOr
 mkVal :: Bexpr -> Val
 mkVal = firstOr
   (ValError ExpectedVal)
-  [ Just . ValName <=< mkName
+  [ Just . ValName <=< mkLower
+  , Just . ValCtor <=< mkUpper
   , Just . ValLit <=< mkLit
   , Just . ValLam <=< mkLam
   , Just . ValCase <=< mkCase
   , Just . ValApp <=< mkAppVal
   ]
-
-mkName :: Bexpr -> Maybe Name
-mkName bexpr = do
-  Leaf (Sexpr.Name name) <- return bexpr
-  Just $ Name name
 
 mkFun :: Bexpr -> Maybe Fun
 mkFun bexpr = do
@@ -167,7 +152,7 @@ mkLit = first
 mkLam :: Bexpr -> Maybe Lam
 mkLam bexpr = do
   Branch Arrow l r <- return bexpr
-  Just $ Lam (mkBinderError l) (mkExpr r)
+  Just $ Lam (mkLowerError l) (mkExpr r)
 
 mkCase :: Bexpr -> Maybe Case
 mkCase bexpr = do
@@ -191,7 +176,8 @@ mkAlt bexpr = case bexpr of
 mkPat :: Bexpr -> Pat
 mkPat = firstOr
   (PatError ExpectedPat)
-  [ Just . PatName <=< mkName
+  [ Just . PatBinder <=< mkLower
+  , Just . PatCtor <=< mkUpper
   , Just . PatLit <=< mkLit
   , Just . PatApp <=< mkAppPat
   ]
@@ -208,6 +194,24 @@ first parsers bexpr = asum $ map ($ bexpr) parsers
 
 firstOr :: a -> [Bexpr -> Maybe a] -> Bexpr -> a
 firstOr error parsers bexpr = fromMaybe error (first parsers bexpr)
+
+mkLower :: Bexpr -> Maybe Path
+mkLower bexpr = case bexpr of
+  Leaf (Name (Lower path)) -> Just path
+  Leaf (Name (NameError error)) -> Just (PathError error)
+  _ -> Nothing
+
+mkUpper :: Bexpr -> Maybe Path
+mkUpper bexpr = case bexpr of
+  Leaf (Name (Upper path)) -> Just path
+  Leaf (Name (NameError error)) -> Just (PathError error)
+  _ -> Nothing
+
+mkLowerError :: Bexpr -> Path
+mkLowerError bexpr = fromMaybe (PathError ExpectedLower) (mkLower bexpr)
+
+mkUpperError :: Bexpr -> Path
+mkUpperError bexpr = fromMaybe (PathError ExpectedUpper) (mkUpper bexpr)
 
 mkUnit :: Bexpr -> Maybe ()
 mkUnit bexpr = do

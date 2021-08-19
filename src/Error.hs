@@ -1,7 +1,8 @@
 module Error (Error(..), Fallible) where
 
 data Error
-  = UnexpectedOp
+  = InvalidName
+  | UnexpectedOp
   | ExpectedItem
   | ExpectedBinder
   | ExpectedVal
@@ -9,6 +10,8 @@ data Error
   | ExpectedCtor
   | ExpectedAlt
   | ExpectedPat
+  | ExpectedLower
+  | ExpectedUpper
   deriving Show
 
 type Fallible a = Either Error a

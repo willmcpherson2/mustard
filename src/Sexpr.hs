@@ -1,9 +1,21 @@
-module Sexpr (Sexpr(..), Op(..), Atom(..), Lit(..), Symbol(..), mkSexpr) where
+module Sexpr
+  ( Sexpr(..)
+  , Op(..)
+  , Atom(..)
+  , Lit(..)
+  , Symbol(..)
+  , Name(..)
+  , Path(..)
+  , mkSexpr
+  ) where
 
+import Control.Monad (guard)
+import Data.Char (isUpper)
 import Data.Foldable (asum)
 import Data.List.Split (splitOn)
 import Data.Map (fromList, lookup)
 import Data.Maybe (fromMaybe)
+import Error (Error(InvalidName))
 import Prelude hiding (lookup)
 import Text.Read (readMaybe)
 import Token (Token(..))
@@ -17,9 +29,15 @@ data Symbol
   deriving (Show)
 
 data Atom
-  = Name [String]
+  = Name Name
   | Lit Lit
   | Unit
+  deriving (Show)
+
+data Name
+  = Upper Path
+  | Lower Path
+  | NameError Error
   deriving (Show)
 
 data Op
@@ -36,6 +54,11 @@ data Lit
   = Int Int
   | Float Float
   deriving (Show)
+
+data Path
+  = Path [String] String
+  | PathError Error
+  deriving Show
 
 mkSexpr :: [Token] -> Sexpr
 mkSexpr = Branch . snd . mk
@@ -58,7 +81,10 @@ mkSexpr = Branch . snd . mk
 
 mkSymbol :: String -> Symbol
 mkSymbol s =
-  let maybe = asum $ map ($ s) [mkOp, mkLit] in fromMaybe (mkName s) maybe
+  let
+    error = Atom $ Name $ NameError InvalidName
+    maybe = asum $ map ($ s) [mkOp, mkLit, mkName]
+  in fromMaybe error maybe
 
 mkOp :: String -> Maybe Symbol
 mkOp s = Op <$> lookup s (fromList ops)
@@ -85,5 +111,12 @@ mkFloat s = do
   float <- readMaybe s :: Maybe Float
   Just $ Atom $ Lit (Float float)
 
-mkName :: String -> Symbol
-mkName = Atom . Name . splitOn "."
+mkName :: String -> Maybe Symbol
+mkName s = do
+  let parts = splitOn "." s
+  guard $ not (null parts) && not (any null parts)
+  let
+    qualifier = init parts
+    name = last parts
+    ctor = if isUpper (head name) then Upper else Lower
+  Just $ Atom $ Name $ ctor $ Path qualifier name
