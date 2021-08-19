@@ -112,7 +112,7 @@ mkExpr bexpr = case bexpr of
 
 mkCtor :: Bexpr -> Ctor
 mkCtor bexpr = case bexpr of
-  Leaf name -> Ctor (mkUpperError (Leaf name)) []
+  Leaf atom -> Ctor (mkUpperError (Leaf atom)) []
   Branch App l r -> case mkCtor l of
     Ctor binder types -> Ctor binder (types ++ [mkType r])
     error -> error
