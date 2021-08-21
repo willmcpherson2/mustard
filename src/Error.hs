@@ -8,7 +8,7 @@ data Error
   | ExpectedVal
   | ExpectedType
   | ExpectedCtor
-  | ExpectedAlt
+  | ExpectedLam
   | ExpectedPat
   | ExpectedLower
   | ExpectedUpper

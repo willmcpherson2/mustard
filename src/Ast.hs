@@ -56,16 +56,13 @@ data Lit
   | LitUnit
   deriving Show
 
-data Lam = Lam Path Expr | LamError Error
+data Lam = Lam Pat Expr | LamError Error
   deriving Show
 
-data Case = Case Expr [Alt] | CaseError Error
+data Case = Case Expr [Lam] | CaseError Error
   deriving Show
 
 data AppVal = AppVal Expr Expr
-  deriving Show
-
-data Alt = Alt Pat Expr | AltError Error
   deriving Show
 
 data Pat
@@ -152,26 +149,24 @@ mkLit = first
 mkLam :: Bexpr -> Maybe Lam
 mkLam bexpr = do
   Branch Arrow l r <- return bexpr
-  Just $ Lam (mkLowerError l) (mkExpr r)
+  Just $ Lam (mkPat l) (mkExpr r)
+
+mkLamError :: Bexpr -> Lam
+mkLamError bexpr = fromMaybe (LamError ExpectedLam) (mkLam bexpr)
 
 mkCase :: Bexpr -> Maybe Case
 mkCase bexpr = do
   Branch Question l r <- return bexpr
-  Just $ Case (mkExpr l) (mkAlts r)
+  Just $ Case (mkExpr l) (mkLams r)
   where
-    mkAlts bexpr = case bexpr of
-      Branch App l r -> mkAlts l ++ [mkAlt r]
-      bexpr -> [mkAlt bexpr]
+    mkLams bexpr = case bexpr of
+      Branch App l r -> mkLams l ++ [mkLamError r]
+      bexpr -> [mkLamError bexpr]
 
 mkAppVal :: Bexpr -> Maybe AppVal
 mkAppVal bexpr = do
   Branch App l r <- return bexpr
   Just $ AppVal (mkExpr l) (mkExpr r)
-
-mkAlt :: Bexpr -> Alt
-mkAlt bexpr = case bexpr of
-  Branch Arrow l r -> Alt (mkPat l) (mkExpr r)
-  _ -> AltError ExpectedAlt
 
 mkPat :: Bexpr -> Pat
 mkPat = firstOr
