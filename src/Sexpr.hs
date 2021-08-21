@@ -56,8 +56,13 @@ data Lit
   deriving (Show)
 
 data Path
-  = Path [String] String
+  = Path [Part] String
   | PathError Error
+  deriving Show
+
+data Part
+  = Named String
+  | Anon Int
   deriving Show
 
 mkSexpr :: [Token] -> Sexpr
@@ -116,7 +121,7 @@ mkName s = do
   let parts = splitOn "." s
   guard $ not (null parts) && not (any null parts)
   let
-    qualifier = init parts
+    qualifier = map Named (init parts)
     name = last parts
     ctor = if isUpper (head name) then Upper else Lower
   Just $ Atom $ Name $ ctor $ Path qualifier name
