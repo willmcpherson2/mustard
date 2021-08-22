@@ -13,13 +13,16 @@ import Ast
 import Error (Fallible)
 
 qualify :: Ast -> Ast
-qualify (Ast items) = Ast $ map nameItem items
+qualify (Ast items) = Ast $ snd $ nameItems 0 items
 
-nameItem :: Fallible Item -> Fallible Item
-nameItem item = case item of
-  Right (ItemLet (Let path expr)) ->
-    Right $ ItemLet $ Let path $ snd $ nameExpr 0 expr
-  _ -> item
+nameItems :: Int -> [Fallible Item] -> (Int, [Fallible Item])
+nameItems id = foldr name (id, [])
+  where
+    name item (id, items) = case item of
+      Right (ItemLet (Let path expr)) ->
+        let (id', expr') = nameExpr id expr
+        in (id', Right (ItemLet $ Let path expr') : items)
+      _ -> (id, item : items)
 
 nameExpr :: Int -> Expr -> (Int, Expr)
 nameExpr id expr = case expr of
