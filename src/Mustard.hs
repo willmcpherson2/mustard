@@ -2,6 +2,7 @@ module Mustard (Stages(..), mkStages) where
 
 import Ast (Ast, mkAst)
 import Bexpr (Bexpr, mkBexpr)
+import Qualify (qualify)
 import Sexpr (Sexpr, mkSexpr)
 import Token (Token, mkTokens)
 
@@ -10,6 +11,7 @@ data Stages = Stages
   , sexpr :: Sexpr
   , bexpr :: Bexpr
   , ast :: Ast
+  , qualified :: Ast
   }
 
 mkStages :: String -> Stages
@@ -19,4 +21,5 @@ mkStages source =
     sexpr = mkSexpr tokens
     bexpr = mkBexpr sexpr
     ast = mkAst bexpr
-  in Stages tokens sexpr bexpr ast
+    qualified = qualify ast
+  in Stages tokens sexpr bexpr ast qualified

@@ -1,4 +1,21 @@
-module Ast (Ast(..), mkAst) where
+module Ast
+  ( Ast(..)
+  , Item(..)
+  , Let(..)
+  , Def(..)
+  , Expr(..)
+  , Ctor(..)
+  , Type(..)
+  , Val(..)
+  , Fun(..)
+  , Lit(..)
+  , Lam(..)
+  , Case(..)
+  , AppVal(..)
+  , Pat(..)
+  , AppPat(..)
+  , mkAst
+  ) where
 
 import Bexpr (Bexpr(..))
 import Control.Monad ((<=<))
@@ -53,7 +70,7 @@ data Lit
   | LitUnit
   deriving Show
 
-data Lam = Lam (Fallible Pat) Expr
+data Lam = Lam Int (Fallible Pat) Expr
   deriving Show
 
 data Case = Case Expr [Fallible Lam]
@@ -144,7 +161,7 @@ mkLit = first
 mkLam :: Bexpr -> Maybe Lam
 mkLam bexpr = do
   Branch Arrow l r <- return bexpr
-  Just $ Lam (orLeft ExpectedPat mkPat l) (mkExpr r)
+  Just $ Lam 0 (orLeft ExpectedPat mkPat l) (mkExpr r)
 
 mkCase :: Bexpr -> Maybe Case
 mkCase bexpr = do
