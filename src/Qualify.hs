@@ -109,7 +109,7 @@ qualifyNamesExpr path expr = case expr of
 
 qualifyNamesVal :: Path -> Val -> Val
 qualifyNamesVal path@(Path _ name) val = case val of
-  ValName valPath@(Path _ valName) ->
+  ValName valPath@(Path [] valName) ->
     ValName $ if name == valName then path else valPath
   ValLam lam -> ValLam $ qualifyNamesLam path lam
   ValCase (Case expr lams) -> ValCase $ Case
