@@ -117,8 +117,8 @@ mkDef bexpr = do
 mkExpr :: Bexpr -> Expr
 mkExpr bexpr = case bexpr of
   Branch Colon l r ->
-    Expr (Just (orLeft ExpectedType mkType l)) (orLeft ExpectedType mkVal r)
-  bexpr -> Expr Nothing (orLeft ExpectedType mkVal bexpr)
+    Expr (Just (orLeft ExpectedType mkType l)) (orLeft ExpectedVal mkVal r)
+  bexpr -> Expr Nothing (orLeft ExpectedVal mkVal bexpr)
 
 mkCtor :: Bexpr -> Maybe Ctor
 mkCtor bexpr = case bexpr of
