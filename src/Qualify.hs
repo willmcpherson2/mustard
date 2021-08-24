@@ -73,7 +73,7 @@ qualifyScopes (Ast items) = Ast $ map (fmap qualifyScopesItem) items
 qualifyScopesItem :: Item -> Item
 qualifyScopesItem item = case item of
   ItemLet (Let (Right path) expr) ->
-    ItemLet $ Let (Right path) (qualifyScopesExpr path expr)
+    ItemLet $ Let (Right path) (qualifyScopesExpr (Path [] path) expr)
   _ -> item
 
 qualifyScopesExpr :: Path -> Expr -> Expr
@@ -128,6 +128,6 @@ qualifyNamesLam path@(Path _ name) (Lam id pat expr) =
 
 patBinders :: Fallible Pat -> [Part]
 patBinders pat = case pat of
-  Right (PatBinder (Path [] name)) -> [name]
+  Right (PatBinder name) -> [name]
   Right (PatApp (AppPat l r)) -> patBinders l ++ patBinders r
   _ -> []

@@ -12,6 +12,8 @@ data Error
   | ExpectedPat
   | ExpectedLower
   | ExpectedUpper
+  | ExpectedLowerBinder
+  | ExpectedUpperBinder
   deriving Show
 
 type Fallible a = Either Error a

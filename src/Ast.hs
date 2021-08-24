@@ -22,7 +22,8 @@ import Control.Monad ((<=<))
 import Data.Foldable (asum)
 import Data.Maybe (fromMaybe)
 import Error (Error(..), Fallible)
-import Sexpr (Atom(Lit, Name, Name, Unit), Name(Lower, Upper), Op(..), Path(..))
+import Sexpr
+  (Atom(Lit, Name, Name, Unit), Name(Lower, Upper), Op(..), Part, Path(..))
 import qualified Sexpr (Lit(..))
 
 newtype Ast = Ast [Fallible Item]
@@ -33,16 +34,16 @@ data Item
   | ItemDef Def
   deriving Show
 
-data Let = Let (Fallible Path) Expr
+data Let = Let (Fallible Part) Expr
   deriving Show
 
-data Def = Def (Fallible Path) [Fallible Ctor]
+data Def = Def (Fallible Part) [Fallible Ctor]
   deriving Show
 
 data Expr = Expr (Maybe (Fallible Type)) (Fallible Val)
   deriving Show
 
-data Ctor = Ctor (Fallible Path) [Fallible Type]
+data Ctor = Ctor (Fallible Part) [Fallible Type]
   deriving Show
 
 data Type
@@ -79,7 +80,7 @@ data AppVal = AppVal Expr Expr
   deriving Show
 
 data Pat
-  = PatBinder Path
+  = PatBinder Part
   | PatCtor Path
   | PatLit Lit
   | PatApp AppPat
@@ -102,12 +103,12 @@ mkItem = first [Just . ItemLet <=< mkLet, Just . ItemDef <=< mkDef]
 mkLet :: Bexpr -> Maybe Let
 mkLet bexpr = do
   Branch Equal l r <- return bexpr
-  Just $ Let (orLeft ExpectedLower mkLower l) (mkExpr r)
+  Just $ Let (orLeft ExpectedLowerBinder mkLowerBinder l) (mkExpr r)
 
 mkDef :: Bexpr -> Maybe Def
 mkDef bexpr = do
   Branch Colon l r <- return bexpr
-  Just $ Def (orLeft ExpectedUpper mkUpper l) (mkCtors r)
+  Just $ Def (orLeft ExpectedUpperBinder mkUpperBinder l) (mkCtors r)
   where
     mkCtors bexpr = case bexpr of
       Branch Pipe l r -> orLeft ExpectedCtor mkCtor l : mkCtors r
@@ -121,7 +122,8 @@ mkExpr bexpr = case bexpr of
 
 mkCtor :: Bexpr -> Maybe Ctor
 mkCtor bexpr = case bexpr of
-  Leaf atom -> Just $ Ctor (orLeft ExpectedUpper mkUpper (Leaf atom)) []
+  Leaf atom ->
+    Just $ Ctor (orLeft ExpectedUpperBinder mkUpperBinder (Leaf atom)) []
   Branch App l r -> case mkCtor l of
     Just (Ctor binder types) ->
       Just $ Ctor binder (types ++ [orLeft ExpectedType mkType r])
@@ -178,7 +180,7 @@ mkAppVal bexpr = do
 
 mkPat :: Bexpr -> Maybe Pat
 mkPat = first
-  [ Just . PatBinder <=< mkLower
+  [ Just . PatBinder <=< mkLowerBinder
   , Just . PatCtor <=< mkUpper
   , Just . PatLit <=< mkLit
   , Just . PatApp <=< mkAppPat
@@ -199,6 +201,16 @@ mkLower bexpr = case bexpr of
 mkUpper :: Bexpr -> Maybe Path
 mkUpper bexpr = case bexpr of
   Leaf (Name (Right (Upper path))) -> Just path
+  _ -> Nothing
+
+mkLowerBinder :: Bexpr -> Maybe Part
+mkLowerBinder bexpr = case bexpr of
+  Leaf (Name (Right (Lower (Path [] name)))) -> Just name
+  _ -> Nothing
+
+mkUpperBinder :: Bexpr -> Maybe Part
+mkUpperBinder bexpr = case bexpr of
+  Leaf (Name (Right (Upper (Path [] name)))) -> Just name
   _ -> Nothing
 
 mkUnit :: Bexpr -> Maybe ()
