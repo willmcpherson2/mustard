@@ -16,7 +16,7 @@ import Data.Foldable (asum)
 import Data.List.Split (splitOn)
 import Data.Map (fromList, lookup)
 import Data.Maybe (fromMaybe)
-import Error (Error(InvalidName))
+import Error (Error(InvalidName), Fallible)
 import Prelude hiding (lookup)
 import Text.Read (readMaybe)
 import Token (Token(..))
@@ -30,7 +30,7 @@ data Symbol
   deriving (Show)
 
 data Atom
-  = Name Name
+  = Name (Fallible Name)
   | Lit Lit
   | Unit
   deriving (Show)
@@ -38,7 +38,6 @@ data Atom
 data Name
   = Upper Path
   | Lower Path
-  | NameError Error
   deriving (Show)
 
 data Op
@@ -56,9 +55,7 @@ data Lit
   | Float Float
   deriving (Show)
 
-data Path
-  = Path [Part] Part
-  | PathError Error
+data Path = Path [Part] Part
   deriving Show
 
 data Part
@@ -88,7 +85,7 @@ mkSexpr = Branch . snd . mk
 mkSymbol :: String -> Symbol
 mkSymbol s =
   let
-    error = Atom $ Name $ NameError InvalidName
+    error = Atom $ Name $ Left InvalidName
     maybe = asum $ map ($ s) [mkOp, mkLit, mkName]
   in fromMaybe error maybe
 
@@ -125,4 +122,4 @@ mkName s = do
     qualifier = map Named (init parts)
     name = last parts
     ctor = if isUpper (head name) then Upper else Lower
-  Just $ Atom $ Name $ ctor $ Path qualifier (Named name)
+  Just $ Atom $ Name $ Right $ ctor $ Path qualifier (Named name)

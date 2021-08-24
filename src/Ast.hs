@@ -22,8 +22,7 @@ import Control.Monad ((<=<))
 import Data.Foldable (asum)
 import Data.Maybe (fromMaybe)
 import Error (Error(..), Fallible)
-import Sexpr
-  (Atom(Lit, Name, Unit), Name(Lower, NameError, Upper), Op(..), Path(..))
+import Sexpr (Atom(Lit, Name, Name, Unit), Name(Lower, Upper), Op(..), Path(..))
 import qualified Sexpr (Lit(..))
 
 newtype Ast = Ast [Fallible Item]
@@ -194,14 +193,12 @@ mkAppPat bexpr = do
 
 mkLower :: Bexpr -> Maybe Path
 mkLower bexpr = case bexpr of
-  Leaf (Name (Lower path)) -> Just path
-  Leaf (Name (NameError error)) -> Just (PathError error)
+  Leaf (Name (Right (Lower path))) -> Just path
   _ -> Nothing
 
 mkUpper :: Bexpr -> Maybe Path
 mkUpper bexpr = case bexpr of
-  Leaf (Name (Upper path)) -> Just path
-  Leaf (Name (NameError error)) -> Just (PathError error)
+  Leaf (Name (Right (Upper path))) -> Just path
   _ -> Nothing
 
 mkUnit :: Bexpr -> Maybe ()
