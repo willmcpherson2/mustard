@@ -6,6 +6,7 @@ module Sexpr
   , Symbol(..)
   , Name(..)
   , Path(..)
+  , Part(..)
   , mkSexpr
   ) where
 
@@ -56,14 +57,14 @@ data Lit
   deriving (Show)
 
 data Path
-  = Path [Part] String
+  = Path [Part] Part
   | PathError Error
   deriving Show
 
 data Part
   = Named String
   | Anon Int
-  deriving Show
+  deriving (Show, Eq)
 
 mkSexpr :: [Token] -> Sexpr
 mkSexpr = Branch . snd . mk
@@ -124,4 +125,4 @@ mkName s = do
     qualifier = map Named (init parts)
     name = last parts
     ctor = if isUpper (head name) then Upper else Lower
-  Just $ Atom $ Name $ ctor $ Path qualifier name
+  Just $ Atom $ Name $ ctor $ Path qualifier (Named name)
