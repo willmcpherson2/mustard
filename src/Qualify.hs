@@ -1,4 +1,4 @@
-module Qualify (qualify) where
+module Qualify (qualify, patBinders) where
 
 import Ast
   ( AppPat(AppPat)
@@ -125,6 +125,8 @@ qualifyNamesLam path@(Path _ name) (Lam id pat expr) =
     expr' =
       if name `elem` patBinders pat then expr else qualifyNamesExpr path expr
   in Lam id pat expr'
+
+--------------------------------------------------------------------------------
 
 patBinders :: Fallible Pat -> [Part]
 patBinders pat = case pat of
