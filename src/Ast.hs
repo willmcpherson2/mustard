@@ -195,22 +195,22 @@ mkAppPat bexpr = do
 
 mkLower :: Bexpr -> Maybe Path
 mkLower bexpr = case bexpr of
-  Leaf (Name (Right (Lower path))) -> Just path
+  Leaf (Name (Lower path)) -> Just path
   _ -> Nothing
 
 mkUpper :: Bexpr -> Maybe Path
 mkUpper bexpr = case bexpr of
-  Leaf (Name (Right (Upper path))) -> Just path
+  Leaf (Name (Upper path)) -> Just path
   _ -> Nothing
 
 mkLowerBinder :: Bexpr -> Maybe Part
 mkLowerBinder bexpr = case bexpr of
-  Leaf (Name (Right (Lower (Path [] name)))) -> Just name
+  Leaf (Name (Lower (Path [] name))) -> Just name
   _ -> Nothing
 
 mkUpperBinder :: Bexpr -> Maybe Part
 mkUpperBinder bexpr = case bexpr of
-  Leaf (Name (Right (Upper (Path [] name)))) -> Just name
+  Leaf (Name (Upper (Path [] name))) -> Just name
   _ -> Nothing
 
 mkUnit :: Bexpr -> Maybe ()

@@ -1,8 +1,7 @@
 module Error (Error(..), Fallible) where
 
 data Error
-  = InvalidName
-  | UnexpectedOp
+  = UnexpectedOp
   | ExpectedItem
   | ExpectedBinder
   | ExpectedVal
