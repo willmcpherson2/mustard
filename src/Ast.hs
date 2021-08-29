@@ -103,12 +103,12 @@ mkItem = first [Just . ItemLet <=< mkLet, Just . ItemDef <=< mkDef]
 mkLet :: Bexpr -> Maybe Let
 mkLet bexpr = do
   Branch Equal l r <- return bexpr
-  Just $ Let (orLeft ExpectedLowerBinder mkLowerBinder l) (mkExpr r)
+  Just $ Let (orLeft ExpectedLower mkLowerBinder l) (mkExpr r)
 
 mkDef :: Bexpr -> Maybe Def
 mkDef bexpr = do
   Branch Colon l r <- return bexpr
-  Just $ Def (orLeft ExpectedUpperBinder mkUpperBinder l) (mkCtors r)
+  Just $ Def (orLeft ExpectedUpper mkUpperBinder l) (mkCtors r)
   where
     mkCtors bexpr = case bexpr of
       Branch Pipe l r -> orLeft ExpectedCtor mkCtor l : mkCtors r
@@ -122,8 +122,7 @@ mkExpr bexpr = case bexpr of
 
 mkCtor :: Bexpr -> Maybe Ctor
 mkCtor bexpr = case bexpr of
-  Leaf atom ->
-    Just $ Ctor (orLeft ExpectedUpperBinder mkUpperBinder (Leaf atom)) []
+  Leaf atom -> Just $ Ctor (orLeft ExpectedUpper mkUpperBinder (Leaf atom)) []
   Branch App l r -> case mkCtor l of
     Just (Ctor binder types) ->
       Just $ Ctor binder (types ++ [orLeft ExpectedType mkType r])
