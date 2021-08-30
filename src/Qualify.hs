@@ -21,16 +21,15 @@ qualify = qualifyScopes . nameScopes
 --------------------------------------------------------------------------------
 
 nameScopes :: Ast -> Ast
-nameScopes (Ast items) = Ast $ snd $ nameScopesItems 0 items
+nameScopes (Ast items) = Ast $ snd $ foldr nameScopesItem (0, []) items
 
-nameScopesItems :: Int -> [Fallible Item] -> (Int, [Fallible Item])
-nameScopesItems id = foldr name (id, [])
-  where
-    name item (id, items) = case item of
-      Right (ItemLet (Let path expr)) ->
-        let (id', expr') = nameScopesExpr id expr
-        in (id', Right (ItemLet $ Let path expr') : items)
-      _ -> (id, item : items)
+nameScopesItem
+  :: Fallible Item -> (Int, [Fallible Item]) -> (Int, [Fallible Item])
+nameScopesItem item (id, items) = case item of
+  Right (ItemLet (Let path expr)) ->
+    let (id', expr') = nameScopesExpr id expr
+    in (id', Right (ItemLet $ Let path expr') : items)
+  _ -> (id, item : items)
 
 nameScopesExpr :: Int -> Expr -> (Int, Expr)
 nameScopesExpr id expr = case expr of
