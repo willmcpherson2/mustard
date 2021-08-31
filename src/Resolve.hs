@@ -1,4 +1,4 @@
-module Resolve (Referent(..), resolve) where
+module Resolve (resolve, resolveMaybe) where
 
 import Ast
   ( AppVal(AppVal)
@@ -10,82 +10,77 @@ import Ast
   , Item(ItemDef, ItemLet)
   , Lam(Lam)
   , Let(Let)
-  , Pat
+  , Type
   , Val(ValApp, ValCase, ValLam)
   )
+import AstUtil (inPat)
 import Control.Applicative ((<|>))
 import Data.Either (rights)
 import Data.List.Extra (firstJust)
+import Data.Maybe (fromJust)
 import Error (Fallible)
-import Qualify (patBinders)
-import Sexpr (Part(Anon, Named), Path(Path))
+import Sexpr (Part(Anon), Path(Path))
 
-data Referent
+data Ref
   = RefLet Let
-  | RefDef Def
-  | RefCtor Ctor
-  | RefLam Lam
-  | RefPat Pat
+  | RefType Def
+  | RefCtor Def Ctor
+  | RefLam (Maybe (Fallible Type)) Lam
+  | RefCase (Maybe (Fallible Type)) Case Lam
 
-resolve :: Path -> Ast -> Maybe [Referent]
-resolve path (Ast items) = do
-  let
-    (part, parts) = case path of
-      Path [] name -> (name, [])
-      Path (part : parts) name -> (part, parts ++ [name])
-  referent <- resolveItems part items
-  referents <- resolveAll parts referent
-  Just $ referent : referents
+resolve :: Ast -> Path -> Ref
+resolve ast path = fromJust $ resolveMaybe ast path
+
+resolveMaybe :: Ast -> Path -> Maybe Ref
+resolveMaybe (Ast items) path = firstJust (resolveItem path) (rights items)
+
+resolveItem :: Path -> Item -> Maybe Ref
+resolveItem path item = case path of
+  Path [] name -> case item of
+    ItemLet le@(Let (Right letName) _) ->
+      if name == letName then Just $ RefLet le else Nothing
+    ItemDef def@(Def (Right defName) _) ->
+      if name == defName then Just $ RefType def else Nothing
+    _ -> Nothing
+  Path (part : parts) name -> case resolveItem (Path [] part) item of
+    Just (RefLet (Let _ expr)) -> resolveExpr (Path parts name) expr
+    Just (RefType def@(Def _ ctors)) ->
+      resolveCtors (Path parts name) def (rights ctors)
+    _ -> Nothing
+
+resolveExpr :: Path -> Expr -> Maybe Ref
+resolveExpr path expr@(Expr ty val) = case path of
+  Path [] name -> case val of
+    Right (ValLam lam@(Lam id _ _)) ->
+      if Anon id == name then Just $ RefLam ty lam else Nothing
+    Right (ValCase cas@(Case expr lams)) ->
+      let
+        inExpr = resolveExpr (Path [] name) expr
+        inLam = RefCase ty cas <$> firstJust (resolveLam name) (rights lams)
+      in inExpr <|> inLam
+      where
+        resolveLam name lam@(Lam id _ _) =
+          if Anon id == name then Just lam else Nothing
+    Right (ValApp (AppVal l r)) ->
+      resolveExpr (Path [] name) l <|> resolveExpr (Path [] name) r
+    _ -> Nothing
+  Path [Anon id] name -> case resolveExpr (Path [] (Anon id)) expr of
+    ref@(Just (RefLam _ (Lam _ (Right pat) _))) ->
+      if inPat name pat then ref else Nothing
+    ref@(Just (RefCase _ _ (Lam _ (Right pat) _))) ->
+      if inPat name pat then ref else Nothing
+    _ -> Nothing
+  Path (part : parts) name -> case resolveExpr (Path [] part) expr of
+    Just (RefLam _ (Lam _ _ expr)) -> resolveExpr (Path parts name) expr
+    Just (RefCase _ _ (Lam _ _ expr)) -> resolveExpr (Path parts name) expr
+    _ -> Nothing
+
+resolveCtors :: Path -> Def -> [Ctor] -> Maybe Ref
+resolveCtors path def ctors = do
+  Path [] name <- return path
+  firstJust (resolveCtor name def) ctors
   where
-    resolveAll parts referent = case parts of
-      [] -> Just []
-      part : parts -> do
-        referent <- resolveReferent part referent
-        referents <- resolveAll parts referent
-        Just $ referent : referents
-
-resolveItems :: Part -> [Fallible Item] -> Maybe Referent
-resolveItems part items = firstJust
-  (getReferentMatch part)
-  (map asReferent $ rights items)
-  where
-    asReferent item = case item of
-      ItemLet le -> RefLet le
-      ItemDef def -> RefDef def
-
-resolveReferent :: Part -> Referent -> Maybe Referent
-resolveReferent name referent = case referent of
-  RefLet (Let _ (Expr _ val)) -> resolveVal name val
-  RefDef (Def _ ctors) ->
-    firstJust (getReferentMatch name) (map RefCtor $ rights ctors)
-  RefLam (Lam _ pat (Expr _ val)) -> case name of
-    Anon _ -> resolveVal name val
-    Named _ -> case pat of
-      Right pat -> if name `elem` patBinders (Right pat)
-        then Just $ RefPat pat
-        else Nothing
-      Left _ -> Nothing
-  _ -> Nothing
-
-resolveVal :: Part -> Fallible Val -> Maybe Referent
-resolveVal name (Right val) = case val of
-  ValLam lam -> getReferentMatch name (RefLam lam)
-  ValCase (Case _ lams) ->
-    firstJust (getReferentMatch name) (map RefLam $ rights lams)
-  ValApp (AppVal (Expr _ l) (Expr _ r)) ->
-    resolveVal name l <|> resolveVal name r
-  _ -> Nothing
-resolveVal _ _ = Nothing
-
-getReferentMatch :: Part -> Referent -> Maybe Referent
-getReferentMatch name referent =
-  if referentMatch name referent then Just referent else Nothing
-
-referentMatch :: Part -> Referent -> Bool
-referentMatch name referent = case referent of
-  RefLet (Let (Right name') _) -> name' == name
-  RefDef (Def (Right name') _) -> name' == name
-  RefCtor (Ctor (Right name') _) -> name' == name
-  RefLam (Lam id _ _) -> Anon id == name
-  RefPat pat -> name `elem` patBinders (Right pat)
-  _ -> False
+    resolveCtor name def ctor = case ctor of
+      Ctor (Right ctorName) _ ->
+        if name == ctorName then Just $ RefCtor def ctor else Nothing
+      _ -> Nothing

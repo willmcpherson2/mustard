@@ -10,6 +10,7 @@ data Error
   | ExpectedPat
   | ExpectedLower
   | ExpectedUpper
+  | InvalidPath
   deriving Show
 
 type Fallible a = Either Error a

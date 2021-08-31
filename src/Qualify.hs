@@ -1,22 +1,25 @@
-module Qualify (qualify, patBinders) where
+module Qualify (qualify) where
 
 import Ast
-  ( AppPat(AppPat)
-  , AppVal(AppVal)
+  ( AppVal(AppVal)
   , Ast(Ast)
   , Case(Case)
   , Expr(Expr)
   , Item(ItemLet)
   , Lam(Lam)
   , Let(Let)
-  , Pat(PatApp, PatBinder)
-  , Val(ValApp, ValCase, ValLam, ValName)
+  , Pat(PatBinder, PatCtor)
+  , Type(TypeName)
+  , Val(ValApp, ValCase, ValCtor, ValLam, ValName)
   )
-import Error (Fallible)
+import AstUtil (foldPat, inPat, mapExprs, mapPats, mapTypes)
+import Data.Either (fromRight)
+import Error (Error(InvalidPath), Fallible)
+import Resolve (resolveMaybe)
 import Sexpr (Part(Anon), Path(Path))
 
 qualify :: Ast -> Ast
-qualify = qualifyScopes . nameScopes
+qualify = validate . qualifyScopes . nameScopes
 
 --------------------------------------------------------------------------------
 
@@ -94,12 +97,14 @@ qualifyNames (Path qualifier name) (Lam id pat expr) =
   let
     path = Path (qualifier ++ [name]) (Anon id)
     expr' = qualifyScopesExpr path expr
-    expr'' = foldl qualify expr' (patBinders pat)
+    expr'' = fromRight expr' (foldPat qualify expr' <$> pat)
   in Lam id pat expr''
   where
-    qualify expr binder =
-      let path = Path (qualifier ++ [name] ++ [Anon id]) binder
-      in qualifyNamesExpr path expr
+    qualify pat expr = case pat of
+      PatBinder binder ->
+        let path = Path (qualifier ++ [name] ++ [Anon id]) binder
+        in qualifyNamesExpr path expr
+      _ -> expr
 
 qualifyNamesExpr :: Path -> Expr -> Expr
 qualifyNamesExpr path expr = case expr of
@@ -108,8 +113,8 @@ qualifyNamesExpr path expr = case expr of
 
 qualifyNamesVal :: Path -> Val -> Val
 qualifyNamesVal path@(Path _ name) val = case val of
-  ValName valPath@(Path [] valName) ->
-    ValName $ if name == valName then path else valPath
+  ValName valPath@(Right (Path [] valName)) ->
+    ValName $ if name == valName then Right path else valPath
   ValLam lam -> ValLam $ qualifyNamesLam path lam
   ValCase (Case expr lams) -> ValCase $ Case
     (qualifyNamesExpr path expr)
@@ -119,16 +124,36 @@ qualifyNamesVal path@(Path _ name) val = case val of
   _ -> val
 
 qualifyNamesLam :: Path -> Lam -> Lam
-qualifyNamesLam path@(Path _ name) (Lam id pat expr) =
-  let
-    expr' =
-      if name `elem` patBinders pat then expr else qualifyNamesExpr path expr
-  in Lam id pat expr'
+qualifyNamesLam path@(Path _ name) (Lam id pat expr) = Lam id pat $ case pat of
+  Right pat -> if inPat name pat then expr else qualifyNamesExpr path expr
+  _ -> qualifyNamesExpr path expr
 
 --------------------------------------------------------------------------------
 
-patBinders :: Fallible Pat -> [Part]
-patBinders pat = case pat of
-  Right (PatBinder name) -> [name]
-  Right (PatApp (AppPat l r)) -> patBinders l ++ patBinders r
-  _ -> []
+validate :: Ast -> Ast
+validate ast =
+  mapTypes (validateType ast)
+    . mapExprs (validateExpr ast)
+    . mapPats (validatePat ast)
+    $ ast
+
+validateExpr :: Ast -> Expr -> Expr
+validateExpr ast (Expr ty val) = Expr ty $ case val of
+  Right (ValName (Right path)) -> Right $ ValName $ validatePath ast path
+  Right (ValCtor (Right path)) -> Right $ ValCtor $ validatePath ast path
+  _ -> val
+
+validatePat :: Ast -> Pat -> Pat
+validatePat ast pat = case pat of
+  PatCtor (Right path) -> PatCtor $ validatePath ast path
+  _ -> pat
+
+validateType :: Ast -> Type -> Type
+validateType ast ty = case ty of
+  TypeName (Right path) -> TypeName $ validatePath ast path
+  _ -> ty
+
+validatePath :: Ast -> Path -> Fallible Path
+validatePath ast path = case resolveMaybe ast path of
+  Just _ -> Right path
+  _ -> Left InvalidPath

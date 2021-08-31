@@ -47,14 +47,14 @@ data Ctor = Ctor (Fallible Part) [Fallible Type]
   deriving Show
 
 data Type
-  = TypeName Path
+  = TypeName (Fallible Path)
   | TypeUnit
   | TypeFun Fun
   deriving Show
 
 data Val
-  = ValName Path
-  | ValCtor Path
+  = ValName (Fallible Path)
+  | ValCtor (Fallible Path)
   | ValLit Lit
   | ValLam Lam
   | ValCase Case
@@ -81,7 +81,7 @@ data AppVal = AppVal Expr Expr
 
 data Pat
   = PatBinder Part
-  | PatCtor Path
+  | PatCtor (Fallible Path)
   | PatLit Lit
   | PatApp AppPat
   deriving Show
@@ -131,15 +131,15 @@ mkCtor bexpr = case bexpr of
 
 mkType :: Bexpr -> Maybe Type
 mkType = first
-  [ Just . TypeName <=< mkUpper
+  [ Just . TypeName . Right <=< mkUpper
   , Just . const TypeUnit <=< mkUnit
   , Just . TypeFun <=< mkFun
   ]
 
 mkVal :: Bexpr -> Maybe Val
 mkVal = first
-  [ Just . ValName <=< mkLower
-  , Just . ValCtor <=< mkUpper
+  [ Just . ValName . Right <=< mkLower
+  , Just . ValCtor . Right <=< mkUpper
   , Just . ValLit <=< mkLit
   , Just . ValLam <=< mkLam
   , Just . ValCase <=< mkCase
@@ -180,7 +180,7 @@ mkAppVal bexpr = do
 mkPat :: Bexpr -> Maybe Pat
 mkPat = first
   [ Just . PatBinder <=< mkLowerBinder
-  , Just . PatCtor <=< mkUpper
+  , Just . PatCtor . Right <=< mkUpper
   , Just . PatLit <=< mkLit
   , Just . PatApp <=< mkAppPat
   ]

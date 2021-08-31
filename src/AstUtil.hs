@@ -1,7 +1,69 @@
-module AstUtil (mapExprs, foldExprs) where
+module AstUtil (mapExprs, foldExprs, mapTypes, mapPats, foldPat, inPat) where
 
 import Ast
-import Data.Either (rights)
+import Data.Either (fromRight, rights)
+import Sexpr (Part)
+
+mapPats :: (Pat -> Pat) -> Ast -> Ast
+mapPats f = mapExprs (mapPatsExpr f)
+
+mapPatsExpr :: (Pat -> Pat) -> Expr -> Expr
+mapPatsExpr f (Expr ty val) = Expr ty $ case val of
+  Right (ValLam lam) -> Right $ ValLam $ mapPatsLam f lam
+  Right (ValCase (Case expr lams)) ->
+    Right $ ValCase $ Case expr $ map (fmap $ mapPatsLam f) lams
+  _ -> val
+
+mapPatsLam :: (Pat -> Pat) -> Lam -> Lam
+mapPatsLam f (Lam id pat expr) = Lam id (mapPatsPat f <$> pat) expr
+
+mapPatsPat :: (Pat -> Pat) -> Pat -> Pat
+mapPatsPat f pat = case f pat of
+  PatApp (AppPat l r) ->
+    PatApp $ AppPat (mapPatsPat f <$> l) (mapPatsPat f <$> r)
+  pat -> pat
+
+foldPat :: (Pat -> a -> a) -> a -> Pat -> a
+foldPat f y pat = case pat of
+  PatApp (AppPat l r) ->
+    let
+      r' = foldPat f y <$> r
+      l' = foldPat f (fromRight y r') <$> l
+      pat' = f pat (fromRight y l')
+    in pat'
+  _ -> f pat y
+
+inPat :: Part -> Pat -> Bool
+inPat name = foldPat (\x acc -> acc || binderMatch name x) False
+  where
+    binderMatch name pat = case pat of
+      PatBinder patName -> name == patName
+      _ -> False
+
+--------------------------------------------------------------------------------
+
+mapTypes :: (Type -> Type) -> Ast -> Ast
+mapTypes f (Ast items) = Ast $ map (fmap (mapTypesItem f)) items
+
+mapTypesItem :: (Type -> Type) -> Item -> Item
+mapTypesItem f item = case item of
+  ItemLet (Let name expr) -> ItemLet $ Let name (mapTypesExpr f expr)
+  ItemDef def -> ItemDef $ mapTypesDef f def
+
+mapTypesDef :: (Type -> Type) -> Def -> Def
+mapTypesDef f (Def name ctors) = Def name (map (fmap (mapTypesCtor f)) ctors)
+
+mapTypesCtor :: (Type -> Type) -> Ctor -> Ctor
+mapTypesCtor f (Ctor name tys) = Ctor name (map (fmap f) tys)
+
+mapTypesExpr :: (Type -> Type) -> Expr -> Expr
+mapTypesExpr f = mapExprsExpr (apply f)
+  where
+    apply f (Expr ty val) = case ty of
+      Just (Right ty) -> Expr (Just $ Right $ f ty) val
+      _ -> Expr ty val
+
+--------------------------------------------------------------------------------
 
 mapExprs :: (Expr -> Expr) -> Ast -> Ast
 mapExprs f (Ast items) = Ast $ map (fmap (mapExprsItems f)) items
