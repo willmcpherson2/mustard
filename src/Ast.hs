@@ -20,7 +20,6 @@ module Ast
 import Bexpr (Bexpr(..))
 import Control.Monad ((<=<))
 import Data.Foldable (asum)
-import Data.Maybe (fromMaybe)
 import Error (Error(..), Fallible)
 import Sexpr
   ( Atom(Lit, Name, Name, Unit)
@@ -238,5 +237,4 @@ first :: [Bexpr -> Maybe a] -> Bexpr -> Maybe a
 first parsers bexpr = asum $ map ($ bexpr) parsers
 
 orLeft :: Error -> (Bexpr -> Maybe a) -> Bexpr -> Fallible a
-orLeft error parser bexpr =
-  fromMaybe (Left error) (parser bexpr >>= Just . Right)
+orLeft error parser bexpr = maybe (Left error) Right (parser bexpr)
