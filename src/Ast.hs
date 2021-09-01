@@ -44,7 +44,7 @@ data Let = Let (Fallible Part) Expr
 data Def = Def (Fallible Part) [Fallible Ctor]
   deriving Show
 
-data Expr = Expr (Maybe (Fallible Type)) (Fallible Val)
+data Expr = Expr (Fallible Type) (Fallible Val)
   deriving Show
 
 data Ctor = Ctor (Fallible Part) [Fallible Type]
@@ -54,6 +54,7 @@ data Type
   = TypeName (Fallible Path)
   | TypeUnit
   | TypeFun Fun
+  | TypeInfer Int
   deriving Show
 
 data Val
@@ -121,8 +122,8 @@ mkDef bexpr = do
 mkExpr :: Bexpr -> Expr
 mkExpr bexpr = case bexpr of
   Branch Colon l r ->
-    Expr (Just (orLeft ExpectedType mkType l)) (orLeft ExpectedVal mkVal r)
-  bexpr -> Expr Nothing (orLeft ExpectedVal mkVal bexpr)
+    Expr (orLeft ExpectedType mkType l) (orLeft ExpectedVal mkVal r)
+  bexpr -> Expr (Right $ TypeInfer 0) (orLeft ExpectedVal mkVal bexpr)
 
 mkCtor :: Bexpr -> Maybe Ctor
 mkCtor bexpr = case bexpr of

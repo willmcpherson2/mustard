@@ -60,7 +60,7 @@ mapTypesExpr :: (Type -> Type) -> Expr -> Expr
 mapTypesExpr f = mapExprsExpr (apply f)
   where
     apply f (Expr ty val) = case ty of
-      Just (Right ty) -> Expr (Just $ Right $ f ty) val
+      Right ty -> Expr (Right $ f ty) val
       _ -> Expr ty val
 
 --------------------------------------------------------------------------------

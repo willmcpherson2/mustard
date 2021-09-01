@@ -25,8 +25,8 @@ data Ref
   = RefLet Let
   | RefType Def
   | RefCtor Def Ctor
-  | RefLam (Maybe (Fallible Type)) Lam
-  | RefCase (Maybe (Fallible Type)) Case Lam
+  | RefLam (Fallible Type) Lam
+  | RefCase (Fallible Type) Case Lam
 
 resolve :: Ast -> Path -> Ref
 resolve ast path = fromJust $ resolveMaybe ast path
