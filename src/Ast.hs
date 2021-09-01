@@ -23,7 +23,12 @@ import Data.Foldable (asum)
 import Data.Maybe (fromMaybe)
 import Error (Error(..), Fallible)
 import Sexpr
-  (Atom(Lit, Name, Name, Unit), Name(Lower, Upper), Op(..), Part, Path(..))
+  ( Atom(Lit, Name, Name, Unit)
+  , Name(Lower, Upper)
+  , Op(..)
+  , Part(Anon)
+  , Path(..)
+  )
 import qualified Sexpr (Lit(..))
 
 newtype Ast = Ast [Fallible Item]
@@ -70,7 +75,7 @@ data Lit
   | LitUnit
   deriving Show
 
-data Lam = Lam Int (Fallible Pat) Expr
+data Lam = Lam Part (Fallible Pat) Expr
   deriving Show
 
 data Case = Case Expr [Fallible Lam]
@@ -161,7 +166,7 @@ mkLit = first
 mkLam :: Bexpr -> Maybe Lam
 mkLam bexpr = do
   Branch Arrow l r <- return bexpr
-  Just $ Lam 0 (orLeft ExpectedPat mkPat l) (mkExpr r)
+  Just $ Lam (Anon 0) (orLeft ExpectedPat mkPat l) (mkExpr r)
 
 mkCase :: Bexpr -> Maybe Case
 mkCase bexpr = do

@@ -52,7 +52,7 @@ resolveExpr :: Path -> Expr -> Maybe Ref
 resolveExpr path expr@(Expr ty val) = case path of
   Path [] name -> case val of
     Right (ValLam lam@(Lam id _ _)) ->
-      if Anon id == name then Just $ RefLam ty lam else Nothing
+      if id == name then Just $ RefLam ty lam else Nothing
     Right (ValCase cas@(Case expr lams)) ->
       let
         inExpr = resolveExpr (Path [] name) expr
@@ -60,7 +60,7 @@ resolveExpr path expr@(Expr ty val) = case path of
       in inExpr <|> inLam
       where
         resolveLam name lam@(Lam id _ _) =
-          if Anon id == name then Just lam else Nothing
+          if id == name then Just lam else Nothing
     Right (ValApp (AppVal l r)) ->
       resolveExpr (Path [] name) l <|> resolveExpr (Path [] name) r
     _ -> Nothing

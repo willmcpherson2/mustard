@@ -65,7 +65,8 @@ nameScopesLams id = foldr name (id, [])
 
 nameScopesLam :: Int -> Lam -> (Int, Lam)
 nameScopesLam id (Lam _ pat expr) =
-  let (id', expr') = nameScopesExpr (id + 1) expr in (id', Lam id pat expr')
+  let (id', expr') = nameScopesExpr (id + 1) expr
+  in (id', Lam (Anon id) pat expr')
 
 --------------------------------------------------------------------------------
 
@@ -95,14 +96,14 @@ qualifyScopesVal path val = case val of
 qualifyNames :: Path -> Lam -> Lam
 qualifyNames (Path qualifier name) (Lam id pat expr) =
   let
-    path = Path (qualifier ++ [name]) (Anon id)
+    path = Path (qualifier ++ [name]) id
     expr' = qualifyScopesExpr path expr
     expr'' = fromRight expr' (foldPat qualify expr' <$> pat)
   in Lam id pat expr''
   where
     qualify pat expr = case pat of
       PatBinder binder ->
-        let path = Path (qualifier ++ [name] ++ [Anon id]) binder
+        let path = Path (qualifier ++ [name] ++ [id]) binder
         in qualifyNamesExpr path expr
       _ -> expr
 
