@@ -30,4 +30,4 @@ executable driver
   import: shared
   hs-source-dirs: driver
   main-is: Main.hs
-  build-depends: mustard, base, containers, pretty-simple, text
+  build-depends: mustard, base, containers, pretty-simple
