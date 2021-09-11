@@ -9,6 +9,10 @@ module AstUtil
   , foldLams
   , mapExprsExpr
   , mapScopes
+  , firstJustExprs
+  , firstJustPat
+  , lastJustPat
+  , mapExprTypes
   ) where
 
 import Ast
@@ -46,6 +50,20 @@ foldPat f y pat = case pat of
     in pat'
   _ -> f pat y
 
+firstJustPat :: (Pat -> Maybe a) -> Pat -> Maybe a
+firstJustPat f = foldPat (apply f) Nothing
+  where
+    apply f pat x = case x of
+      Just x -> Just x
+      _ -> f pat
+
+lastJustPat :: (Pat -> Maybe a) -> Pat -> Maybe a
+lastJustPat f = foldPat (apply f) Nothing
+  where
+    apply f pat x = case f pat of
+      Just x' -> Just x'
+      _ -> x
+
 inPat :: Part -> Pat -> Bool
 inPat name = foldPat (\x acc -> acc || binderMatch name x) False
   where
@@ -55,26 +73,34 @@ inPat name = foldPat (\x acc -> acc || binderMatch name x) False
 
 --------------------------------------------------------------------------------
 
-mapTypes :: (Type -> Type) -> Ast -> Ast
+mapTypes :: (Fallible Type -> Fallible Type) -> Ast -> Ast
 mapTypes f (Ast items) = Ast $ map (fmap (mapTypesItem f)) items
 
-mapTypesItem :: (Type -> Type) -> Item -> Item
+mapTypesItem :: (Fallible Type -> Fallible Type) -> Item -> Item
 mapTypesItem f item = case item of
   ItemLet (Let name expr) -> ItemLet $ Let name (mapTypesExpr f expr)
   ItemDef def -> ItemDef $ mapTypesDef f def
 
-mapTypesDef :: (Type -> Type) -> Def -> Def
+mapTypesDef :: (Fallible Type -> Fallible Type) -> Def -> Def
 mapTypesDef f (Def name ctors) = Def name (map (fmap (mapTypesCtor f)) ctors)
 
-mapTypesCtor :: (Type -> Type) -> Ctor -> Ctor
-mapTypesCtor f (Ctor name tys) = Ctor name (map (fmap f) tys)
+mapTypesCtor :: (Fallible Type -> Fallible Type) -> Ctor -> Ctor
+mapTypesCtor f (Ctor name tys) = Ctor name (map (mapTypesType f) tys)
 
-mapTypesExpr :: (Type -> Type) -> Expr -> Expr
+mapTypesExpr :: (Fallible Type -> Fallible Type) -> Expr -> Expr
 mapTypesExpr f = mapExprsExpr (apply f)
-  where
-    apply f (Expr ty val) = case ty of
-      Right ty -> Expr (Right $ f ty) val
-      _ -> Expr ty val
+  where apply f (Expr ty val) = Expr (f ty) val
+
+mapTypesType
+  :: (Fallible Type -> Fallible Type) -> Fallible Type -> Fallible Type
+mapTypesType f ty = case f ty of
+  Right (TypeFun (Fun l r)) ->
+    Right $ TypeFun $ Fun (mapTypesType f l) (mapTypesType f r)
+  ty -> ty
+
+mapExprTypes :: (Fallible Type -> Fallible Type) -> Ast -> Ast
+mapExprTypes f = mapExprs (apply f)
+  where apply f (Expr ty val) = Expr (mapTypesType f ty) val
 
 --------------------------------------------------------------------------------
 
@@ -203,3 +229,12 @@ foldLams f x lams = case lams of
         Left _ -> (lam, x)
       (lams', x'') = foldLams f x' lams
     in (lam' : lams', x'')
+
+--------------------------------------------------------------------------------
+
+firstJustExprs :: (Expr -> Maybe a) -> Ast -> Maybe a
+firstJustExprs f = snd . foldExprs (apply f) Nothing
+  where
+    apply f expr result = case result of
+      Just result -> (expr, Just result)
+      _ -> (expr, f expr)

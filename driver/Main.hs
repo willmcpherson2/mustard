@@ -29,6 +29,7 @@ parse args parsed = case args of
   arg@"--bexpr" : args -> parse args (insert arg "" parsed)
   arg@"--ast" : args -> parse args (insert arg "" parsed)
   arg@"--qualified" : args -> parse args (insert arg "" parsed)
+  arg@"--typeChecked" : args -> parse args (insert arg "" parsed)
   arg@"-c" : source : args -> parse args (insert arg source parsed)
   source : args -> parse args (insert "" source parsed)
   [] -> Right parsed
@@ -50,6 +51,7 @@ handleArgs args = case lookup "" args of
       showStage "Bexpr:" "--bexpr" args bexpr stages
       showStage "Ast:" "--ast" args ast stages
       showStage "Qualified:" "--qualified" args qualified stages
+      showStage "Type checked:" "--typeChecked" args typeChecked stages
     showStage header arg args stage stages = when
       (member arg args)
       (do

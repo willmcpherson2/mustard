@@ -55,7 +55,7 @@ data Type
   | TypeUnit
   | TypeFun Fun
   | TypeInfer Int
-  deriving Show
+  deriving (Show, Eq)
 
 data Val
   = ValName (Fallible Path)
@@ -67,7 +67,7 @@ data Val
   deriving Show
 
 data Fun = Fun (Fallible Type) (Fallible Type)
-  deriving Show
+  deriving (Show, Eq)
 
 data Lit
   = LitInt Int

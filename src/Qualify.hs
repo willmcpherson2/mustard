@@ -61,7 +61,7 @@ qualifyName qualifier inPat (Expr ty val) = Expr ty $ case val of
 
 validate :: Ast -> Ast
 validate ast =
-  mapTypes (validateType ast)
+  mapTypes (fmap $ validateType ast)
     . mapExprs (validateExpr ast)
     . mapPats (validatePat ast)
     $ ast

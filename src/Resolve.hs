@@ -1,19 +1,30 @@
-module Resolve (resolve, resolveMaybe) where
+module Resolve
+  ( resolve
+  , resolveMaybe
+  , Ref(..)
+  , binderType
+  , ctorType
+  , patType
+  ) where
 
 import Ast
-  ( AppVal(AppVal)
+  ( AppPat(AppPat)
+  , AppVal(AppVal)
   , Ast(Ast)
   , Case(Case)
   , Ctor(Ctor)
   , Def(Def)
   , Expr(Expr)
+  , Fun(Fun)
   , Item(ItemDef, ItemLet)
   , Lam(Lam)
   , Let(Let)
-  , Type
+  , Lit(LitUnit)
+  , Pat(PatApp, PatBinder, PatCtor, PatLit)
+  , Type(TypeFun, TypeName, TypeUnit)
   , Val(ValApp, ValCase, ValLam)
   )
-import AstUtil (inPat)
+import AstUtil (firstJustPat, inPat, lastJustPat)
 import Control.Applicative ((<|>))
 import Data.Either (rights)
 import Data.List.Extra (firstJust)
@@ -83,4 +94,57 @@ resolveCtors path def ctors = do
     resolveCtor name def ctor = case ctor of
       Ctor (Right ctorName) _ ->
         if name == ctorName then Just $ RefCtor def ctor else Nothing
+      _ -> Nothing
+
+--------------------------------------------------------------------------------
+
+binderType :: Ast -> Part -> Pat -> Maybe Type
+binderType ast binder pat = do
+  l <- lastJustPat (appOfBinder binder) pat
+  Right ty : _ <- argsOfCtor ast l
+  Just ty
+  where
+    appOfBinder binder pat = case pat of
+      PatApp (AppPat (Right l) (Right (PatBinder r))) ->
+        if binder == r then Just l else Nothing
+      _ -> Nothing
+    argsOfCtor ast pat = case pat of
+      PatCtor (Right path) -> case resolve ast path of
+        RefCtor _ (Ctor _ tys) -> Just tys
+        _ -> undefined
+      PatApp (AppPat (Right l) _) -> do
+        Right _ : tys <- argsOfCtor ast l
+        Just tys
+      _ -> Nothing
+
+--------------------------------------------------------------------------------
+
+ctorType :: Ast -> Path -> Maybe Type
+ctorType ast path = case resolve ast path of
+  RefCtor (Def (Right defName) _) (Ctor _ tys) ->
+    typesToFun (TypeName $ Right $ Path [] defName) tys
+  _ -> undefined
+  where
+    typesToFun ret tys = case tys of
+      [] -> Just ret
+      Right ty : tys -> do
+        tys <- typesToFun ret tys
+        Just $ TypeFun $ Fun (Right ty) (Right tys)
+      _ -> Nothing
+
+--------------------------------------------------------------------------------
+
+patType :: Ast -> Pat -> Maybe Type
+patType ast pat = case pat of
+  PatLit lit -> case lit of
+    LitUnit -> Just TypeUnit
+    _ -> undefined
+  _ -> do
+    ty <- firstJustPat (getCtorType ast) pat
+    Just $ case ty of
+      TypeFun (Fun _ (Right ty)) -> ty
+      _ -> ty
+  where
+    getCtorType ast pat = case pat of
+      PatCtor (Right path) -> ctorType ast path
       _ -> Nothing

@@ -11,6 +11,7 @@ data Error
   | ExpectedLower
   | ExpectedUpper
   | InvalidPath
-  deriving Show
+  | TypeConflict
+  deriving (Show, Eq)
 
 type Fallible a = Either Error a

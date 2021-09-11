@@ -8,6 +8,8 @@ module Sexpr
   , Path(..)
   , Part(..)
   , mkSexpr
+  , namePart
+  , asPath
   ) where
 
 import Control.Monad (guard)
@@ -55,7 +57,7 @@ data Lit
   deriving (Show)
 
 data Path = Path [Part] Part
-  deriving Show
+  deriving (Show, Eq)
 
 data Part
   = Named String
@@ -122,3 +124,11 @@ mkName s = do
     name = last parts
     ctor = if isUpper (head name) then Upper else Lower
   Just $ Atom $ Name $ ctor $ Path qualifier (Named name)
+
+--------------------------------------------------------------------------------
+
+namePart :: Path -> Part
+namePart (Path _ name) = name
+
+asPath :: Part -> Path
+asPath = Path []

@@ -23,7 +23,7 @@ library
   import: shared
   hs-source-dirs: src
   exposed-modules: Mustard
-  other-modules: Error, Token, Sexpr, Bexpr, Ast, AstUtil, Qualify, Resolve
+  other-modules: Error, Token, Sexpr, Bexpr, Ast, AstUtil, Qualify, Resolve, TypeCheck
   build-depends: base, extra, containers, split
 
 executable driver

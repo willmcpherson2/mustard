@@ -5,6 +5,7 @@ import Bexpr (Bexpr, mkBexpr)
 import Qualify (qualify)
 import Sexpr (Sexpr, mkSexpr)
 import Token (Token, mkTokens)
+import TypeCheck (typeCheck)
 
 data Stages = Stages
   { tokens :: [Token]
@@ -12,6 +13,7 @@ data Stages = Stages
   , bexpr :: Bexpr
   , ast :: Ast
   , qualified :: Ast
+  , typeChecked :: Ast
   }
 
 mkStages :: String -> Stages
@@ -22,4 +24,5 @@ mkStages source =
     bexpr = mkBexpr sexpr
     ast = mkAst bexpr
     qualified = qualify ast
-  in Stages tokens sexpr bexpr ast qualified
+    typeChecked = typeCheck qualified
+  in Stages tokens sexpr bexpr ast qualified typeChecked
