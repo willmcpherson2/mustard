@@ -8,3 +8,5 @@
 !driver/**
 !src
 !src/**
+!examples
+!examples/**

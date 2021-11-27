@@ -1,0 +1,6 @@
+(Bool : False | True)
+
+(not = x ->
+  x ?
+    (Bool.False -> Bool.True)
+    (Bool.True -> Bool.False))
